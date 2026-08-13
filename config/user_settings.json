@@ -1,0 +1,16 @@
+{
+    "timeout_mismatch": {
+        "enabled": false,
+        "seconds": 1
+    },
+    "timeout_unknown": {
+        "enabled": false,
+        "seconds": 1
+    },
+    "audio": {
+        "bgm_enabled": false,
+        "sfx_enabled": true
+    },
+    "fuzzy_threshold": 1.0,
+    "max_strikes": 20
+}

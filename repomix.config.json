@@ -1,0 +1,36 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "headerText": "ERP Automation Codebase Summary - Catatan Penting: File data JSON dan file Debug dikecualikan untuk efisiensi token.",
+    "instructionFilePath": "REPOMIX_INSTRUCTIONS.md",
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "showLineNumbers": true
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "**/__pycache__/**",
+      "*.pyc",
+      "venv/**",
+      "logs/**",
+      "debug_images/**",
+      "kirim/**",
+      ".git/**",
+      ".vscode/**",
+      "*.xlsx",
+      "*.csv",
+      "master_data.json",
+      "stores.json",
+      "coordinates.json",
+      "coordinates_phase2.json",
+      "repomix-output.xml",
+      "debug_*.py",
+      "setup_win_auto.bat",
+      "__init__.py",
+      "requirement"
+    ]
+  }
+}

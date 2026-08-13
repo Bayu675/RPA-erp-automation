@@ -1,0 +1,31 @@
+# 🤖 ERP AUTOMATION SUITE V9.0 (Legacy Batch)
+
+Bot RPA untuk otomatisasi input dan audit transaksi ERP Desktop.
+Support: Single Transaction & Multi-Store Batch Processing.
+
+## 📋 Fitur Utama
+1. **Smart Selector:** Otomatis mencari Toko di dropdown (Nove, BCW, dll).
+2. **Auto-Audit:** Membaca OCR, menghitung ulang total, PPN, dan Diskon bertingkat.
+3. **Cursor Strategy:** Skip transaksi error, lanjut ke bawahnya.
+4. **Excel Reporting:** Mencatat log error di `audit_rejects.xlsx`.
+
+## 🛠️ Persiapan (Wajib di PC Baru)
+1. **Install Python 3.10+**
+2. **Install Tesseract OCR (Aplikasi)**
+   - Windows: Download installer Tesseract, install, lalu add ke Path Environment.
+   - Linux: `sudo apt install tesseract-ocr`
+3. **Install Library Python:**
+   ```bash
+   pip install -r requirements.txt
+
+
+📂 Struktur File Penting
+main.py: Pintu masuk program.
+
+core/batch_manager.py: Mengatur target toko (TARGET_STORES). Edit file ini jika nama toko berubah.
+
+master_data.json: Database harga barang (Wajib update jika harga naik).
+
+audit_rejects.xlsx: Laporan transaksi yang gagal/reject.
+
+Created by Bayu A.K.A Ryu - 2025 - 12 - 12

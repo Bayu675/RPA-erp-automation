@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+venv/
+env/
+logs/
+debug_images/
+backups/
+*.xlsx
+*.csv
+master_data.json
+stores.json
+coordinates.json
+coordinates_phase2.json
+repomix-output.xml
