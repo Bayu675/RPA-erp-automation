@@ -212,20 +212,32 @@ class DatabaseManager:
 
             elif choice == '6': # New Menu for Rules
                 print("\n📐 PRICE RULES EDITOR")
-                print("   [A] Rule Matematika:")
-                print("       Format: variable operator nilai")
-                print("       Contoh: m2 <= 0.5  (Jika m2 kecil dari 0.5)")
-                print("   [B] Rule Selalu Aktif (Upselling):")
-                print("       Ketik: True")
+                print("   [1] ✏️  Set / Update Rule")
+                print("   [2] 🗑️  Hapus Rule")
+                print("   [b] 🔙 Batal")
                 
-                rule_str = input("   Logika (Kosongkan utk hapus, 'b' batal): ").strip()
-                if rule_str.lower() == 'b': continue
-                if not rule_str:
-                    # Logic hapus rule existing untuk item ini (complex, skip for now or simple implementation)
-                    print("   Rule dihapus/dikosongkan.")
-                else:
+                sub_rule = input("   Pilih [1/2/b]: ").strip().lower()
+                if sub_rule == 'b': continue
+                
+                if sub_rule == '2':
+                    # Hapus Eksplisit
+                    if 'custom_rule' in item:
+                        del item['custom_rule']
+                        self.save_db()
+                    print("   ✅ Rule berhasil dihapus.")
+                    time.sleep(1)
+                    
+                elif sub_rule == '1':
+                    # Set / Update Eksplisit
+                    print("\n   👉 Logika (Contoh: m2 <= 0.5)")
+                    print("   👉 Kosongkan lalu tekan Enter jika ingin rule SELALU AKTIF (True)")
+                    rule_str = input("   Logika: ").strip()
+                    
+                    if not rule_str:
+                        rule_str = "True" # Mutlak True jika dikosongkan
+                        
                     disc_str = input("   Diskon % jika kena rule (cth: 50): ").strip()
-                    # [NEW] Tanya Mode Hitung
+                    
                     print("   Mode Hitung saat Rule Kena:")
                     print("   [1] NORMAL  (Tetap dikali M2 asli)")
                     print("   [2] FLAT M2 (M2 dianggap 1 / Diabaikan)")
@@ -235,16 +247,19 @@ class DatabaseManager:
                     if mode_in == '2': calc_mode = "FLAT_M2"
                     elif mode_in == '3': calc_mode = "ALLOW_UPS"
                     else: calc_mode = "NORMAL"
+                    
                     try:
-                        # Simple validation
                         is_math = re.match(r'([a-zA-Z0-9_]+)\s*(<=|>=|==|!=|<|>)\s*([0-9\.]+)', rule_str)
                         is_bool = (rule_str.lower() == 'true')
 
                         if not (is_math or is_bool):
-                            print("❌ Format salah! Ketik 'True' atau rumus matematika (cth: m2 <= 0.5)")
+                            print("❌ Format salah! Ketik rumus matematika (cth: m2 <= 0.5) atau kosongkan.")
                         else:
-                            
-                            item['custom_rule'] = {'logic': rule_str, 'disc': float(disc_str), 'mode': calc_mode}
+                            item['custom_rule'] = {
+                                'logic': rule_str, 
+                                'disc': float(disc_str) if disc_str else 0.0, 
+                                'mode': calc_mode
+                            }
                             self.save_db()
                             print("✅ Rule tersimpan!")
                             time.sleep(1)

@@ -73,8 +73,8 @@ class Executor:
 
                         # --- LOGIKA CUSTOM DELAY BARU ---
             custom_delay = step_data.get('custom_delay')
-            if custom_delay is not None:
-                final_delay = custom_delay
+            if custom_delay is not None and str(custom_delay).strip() != "":
+                final_delay = float(custom_delay)
             elif delay is not None:
                 final_delay = delay
             else:

@@ -55,7 +55,8 @@ def generate_from_excel(excel_path):
         ]
 
         # Logika Data
-        is_netto = all(d == 0.0 for d in discs)
+        #is_netto = all(d == 0.0 for d in discs)
+        is_netto = False
         price_validation = not any(kw in name for kw in keywords_no_val)
 
         master_db[name] = {
