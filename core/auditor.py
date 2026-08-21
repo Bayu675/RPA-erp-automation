@@ -153,9 +153,9 @@ class ERP_Auditor:
         ppocr_logger.setLevel(logging.ERROR)
         
         self.consecutive_empty_rows = 0
-        self.last_line_no = -1 
-        self.last_content_signature = "" 
-        self.consecutive_dupes = 0
+        self.last_line_image = None
+        self.stuck_counter = 0
+        self.last_line_no = -1
         
         self.bucket_eligible_for_footer = 0.0 
         self.bucket_netto_items = 0.0         
@@ -610,8 +610,9 @@ class ERP_Auditor:
         self.bucket_netto_items = 0.0
         self.bucket_non_taxable = 0.0
         self.total_gross_items = 0.0
-        self.last_line_no = -1 
-        self.last_content_signature = "" 
+        self.last_line_image = None
+        self.stuck_counter = 0
+        self.last_line_no = -1
         
         list_service = self.rules.get('service_items', [])
         list_no_disc = self.rules.get('no_discount_items', [])
@@ -654,8 +655,35 @@ class ERP_Auditor:
 
                 print(f"\r   ⚙️  Membaca teks (OCR) baris ke-{row_index}...    ", end="", flush=True)
 
-                raw_line = self.ocr_column(full_ss, self.coords['col_line_no'], gy_top, gy_bot, custom_config='--psm 10 -c tessedit_char_whitelist=0123456789lI|[]!', mode='repair_broken_font', debug_name="col_line_no")
+                x1_line = self.coords['col_line_no']['x_start']
+                x2_line = self.coords['col_line_no']['x_end']
+                line_crop = full_ss.crop((x1_line, gy_top, x2_line, gy_bot))
+                current_line_img = cv2.cvtColor(np.array(line_crop), cv2.COLOR_RGB2GRAY)
+
+                is_duplicate = False
+                if self.last_line_image is not None:
+                    # Auto-adjust frame size consistency 
+                    if current_line_img.shape != self.last_line_image.shape:
+                        self.last_line_image = cv2.resize(self.last_line_image, (current_line_img.shape[1], current_line_img.shape[0]))
+                    
+                    blur_curr = cv2.GaussianBlur(current_line_img, (3, 3), 0)
+                    blur_last = cv2.GaussianBlur(self.last_line_image, (3, 3), 0)
+                    
+                    diff_matrix = cv2.absdiff(blur_curr, blur_last)
+                    _, thresh_diff = cv2.threshold(diff_matrix, 20, 255, cv2.THRESH_BINARY)
+                    changed_px = cv2.countNonZero(thresh_diff)
+                    if changed_px < 15:
+                        is_duplicate = True
+
+                # Execute standard OCR exclusively for console logging (UI display)
+                raw_line = self.ocr_column(full_ss, self.coords['col_line_no'], gy_top, gy_bot, custom_config='--psm 10', mode='repair_broken_font')
                 val_line, _ = self.clean_number_with_raw(raw_line)
+
+                # FIX: Double Protection (Safety Net). Jika OCR berhasil baca, dan angkanya kembar, mutlak duplikat!
+                if val_line > 0:
+                    if val_line == self.last_line_no: 
+                        is_duplicate = True
+                    self.last_line_no = val_line
 
                 raw_name = self.ocr_column(full_ss, self.coords['col_item_name'], gy_top, gy_bot, custom_config='--psm 6', mode='name_safe', debug_name="col_item_name")
                 
@@ -770,32 +798,20 @@ class ERP_Auditor:
                         BotLogger.warn(f"⛔ REJECTED: Timeout / Input tidak valid saat cek harga -> [{raw_name}]")
                         return False 
 
-                current_signature = f"{raw_name}_{val_price}_{val_qty}"
-                full_content_signature = f"{raw_name}|{val_price}|{val_qty}|{val_m2}"
-                is_duplicate = False
-
-                if val_line > 0:
-                    if val_line == self.last_line_no: is_duplicate = True
-                    self.last_line_no = val_line 
-                else:
-                    if full_content_signature == self.last_content_signature and self.last_content_signature != "":
-                       is_duplicate = True
-                       print(f"\n   ⚠️ Content Match: {full_content_signature} (Line {val_line})") 
-                
                 if is_duplicate:
-                    self.consecutive_dupes += 1
-                    print(f"\n   ⚠️ Duplicate Row Detected ({self.consecutive_dupes}/3). Scrolling...")
-                    if self.consecutive_dupes >= 3: 
-                        print("   🛑 Table End Reached (3x Duplicate).")
+                    self.stuck_counter += 1
+                    print(f"\n   ⚠️ UI Frame Statis ({self.stuck_counter}/2). Verifikasi scroll...")
+                    if self.stuck_counter >= 2: 
+                        print("   🛑 Table End Reached (EOF). Mengakhiri audit tabel.")
                         break
                     pyautogui.press('down')
                     time.sleep(0.5) 
                     time.sleep(self.spd['audit_scroll'])
                     continue 
                 else:
-                    self.consecutive_dupes = 0 
-                
-                self.last_content_signature = full_content_signature
+                    self.stuck_counter = 0 
+                    # Snapshot target matrix for next loop iteration
+                    self.last_line_image = current_line_img.copy()
 
                 is_service = any(k in raw_name for k in list_service) or "BIAYA" in raw_name
                 is_no_disc = any(k in raw_name for k in list_no_disc)
