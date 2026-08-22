@@ -1,4 +1,5 @@
 # erp-automation/core/executor.py
+
 import json
 import time
 import sys
@@ -30,7 +31,7 @@ class Executor:
         # [FIX] Cek Stop Request di awal setiap langkah
         if bot_state.STOP_REQUESTED:
             print("\n🛑 STOP REQUESTED (Executor).")
-            raise KeyboardInterrupt("User requested stop") # [FIX] Raise Exception, jangan sys.exit
+            raise KeyboardInterrupt("User requested stop")
 
         if step_id not in self.coords:
             print(f"⚠️  SKIP: Data '{step_msg}' gak ada di JSON.")
@@ -47,19 +48,14 @@ class Executor:
                 # APPLY OFFSET (Khusus Logic Turun Baris / Retry)
                 if y_offset > 0:
                     y += y_offset
-                    # print(f"[Offset +{y_offset}px]...", end=" ") # Silent offset
                 
                 pyautogui.moveTo(x, y, duration=self.spd['mouse_duration']) 
                 pyautogui.click()
-                # print(f"✅ Typed '{final_val}'") # Silent type
 
             elif action == 'type':
-                # [FIX] Strict Type Handling for Pylance
                 val_from_json: Optional[str] = step_data.get('value')
                 
-                # Prioritas: JSON > Code Default > Empty String (Safety)
                 final_val: str = ""
-                
                 if val_from_json is not None:
                     final_val = str(val_from_json)
                 elif default_val_from_code is not None:
@@ -68,10 +64,8 @@ class Executor:
                 if final_val:
                     pyautogui.write(final_val, interval=0.1)
                     print(f"✅ Typed '{final_val}'")
-                else:
-                    pass
 
-                        # --- LOGIKA CUSTOM DELAY BARU ---
+            # --- LOGIKA CUSTOM DELAY DARI DASHBOARD / CONFIG ---
             custom_delay = step_data.get('custom_delay')
             if custom_delay is not None and str(custom_delay).strip() != "":
                 final_delay = float(custom_delay)
@@ -83,18 +77,23 @@ class Executor:
 
         except Exception as e:
             print(f"\n❌ Error: {e}")
-            raise e # Lempar error ke atas biar ditangkap main loop
+            raise e
 
     def run_reset_sequence(self):
         print("\n🧹 JALANIN RITUAL RESET (Cuci Piring)...")
+        # Muat ulang konfigurasi koordinat terbaru
+        self.load_config()
         for step in RESET_STEPS:
-            self.execute_step(step['id'], step['msg'], delay=0.8)
+            self.execute_step(step['id'], step['msg'], delay=None)
         print("✅ Reset Selesai. Form bersih.")
 
     def run_phase_1(self, retry_idx: int = 0, skip_customer_selection: bool = False, initial_wait: bool = True):
         print(f"\n🤖 STARTING AUTOMATION (PHASE 1) - Attempt #{retry_idx + 1}")
         print("==================================")
         
+        # Muat ulang koordinat terbaru
+        self.load_config()
+
         if retry_idx == 0 and initial_wait:
             wait_time = self.spd['start_buffer']
             print("⚠️  GESER MOUSE KE POJOK KIRI-ATAS UNTUK STOP!")
@@ -114,7 +113,7 @@ class Executor:
             dynamic_row_height = self.coords.get('GLOBAL_ROW_HEIGHT', 18)
             current_offset = 0
             if s_id in ["5_checkbox_add_so"] and retry_idx > 0:
-                current_offset = retry_idx * dynamic_row_height  # 18px per row
+                current_offset = retry_idx * dynamic_row_height
             
             self.execute_step(s_id, s_msg, default_val_from_code=s_val_default, delay=None, y_offset=current_offset)
         

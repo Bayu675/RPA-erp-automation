@@ -78,43 +78,55 @@ HTML_TEMPLATE = r"""
             <!-- STEP DELAYS -->
             <div class="tab-pane fade" id="delays">
                 <div class="alert alert-info">
-                    <strong>Info:</strong> Atur jeda waktu (dalam detik) setelah bot melakukan aksi pada langkah tertentu. Kosongkan untuk menggunakan delay default dari Speed Profile.
+                    <strong>Info:</strong> Atur jeda waktu (dalam detik) setelah bot melakukan aksi pada langkah tertentu. Kosongkan nilai delay untuk menggunakan nilai bawaan (Speed Profile default).
                 </div>
                 
                 <div class="row">
                     <!-- PHASE 1 TABLE -->
-                    <div class="col-md-6">
-                        <h5 class="text-primary fw-bold">Phase 1 (Input & Reset)</h5>
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>ID Langkah</th>
-                                        <th>Aksi</th>
-                                        <th width="150">Delay (Detik)</th>
-                                        <th width="80">Simpan</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="delayBodyPhase1"></tbody>
-                            </table>
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-primary text-white fw-bold">
+                                📋 Phase 1 & Reset Steps (coordinates.json)
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>ID Langkah</th>
+                                                <th>Aksi / Tipe</th>
+                                                <th width="140">Delay (Detik)</th>
+                                                <th width="80">Simpan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="delayBodyPhase1"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- PHASE 2 TABLE -->
-                    <div class="col-md-6">
-                        <h5 class="text-success fw-bold">Phase 2 (Audit & Footer)</h5>
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>ID Langkah</th>
-                                        <th>Aksi</th>
-                                        <th width="150">Delay (Detik)</th>
-                                        <th width="80">Simpan</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="delayBodyPhase2"></tbody>
-                            </table>
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-success text-white fw-bold">
+                                🔍 Phase 2, Save & Action Steps (coordinates_phase2.json)
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>ID Langkah</th>
+                                                <th>Aksi / Tipe</th>
+                                                <th width="140">Delay (Detik)</th>
+                                                <th width="80">Simpan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="delayBodyPhase2"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -161,7 +173,6 @@ HTML_TEMPLATE = r"""
                     </div>
                     <hr>
                     <!-- BATCH RULES -->
-                   <hr>
                     <div class="mb-2">
                         <label class="fw-bold text-primary">Aksi Price Rules Massal</label>
                         <select id="batchRuleAction" class="form-select border-primary" onchange="toggleBatchRuleInputs()">
@@ -321,7 +332,7 @@ HTML_TEMPLATE = r"""
             let res = await fetch('/api/master');
             masterData = await res.json();
             renderMasterTable();
-            filterTable(); // [FIX BUG 1] Panggil filter lagi setelah render ulang agar pencarian tidak reset
+            filterTable();
         }
 
         function renderMasterTable() {
@@ -405,18 +416,17 @@ HTML_TEMPLATE = r"""
             if(netto !== "") updates.is_netto = (netto === "true");
             if(taxable !== "") updates.is_taxable = (taxable === "true");
 
-            // LOGIKA BATCH RULE BARU
             let ruleAction = document.getElementById('batchRuleAction').value;
             if (ruleAction === 'UPDATE') {
                 let logic = document.getElementById('batchRuleLogic').value.trim();
                 let mode = document.getElementById('batchRuleMode').value;
                 let ruleDisc = parseFloat(document.getElementById('batchRuleDisc').value || 0);
 
-                if (logic === "") logic = "True"; // Otomatis True jika kosong
+                if (logic === "") logic = "True";
 
                 updates.custom_rule = { logic: logic, disc: ruleDisc, mode: mode };
             } else if (ruleAction === 'DELETE') {
-                updates.custom_rule = null; // Hapus rule
+                updates.custom_rule = null;
             }
 
             if(Object.keys(updates).length === 0) {
@@ -434,18 +444,19 @@ HTML_TEMPLATE = r"""
         }
 
         // --- SINGLE EDIT LOGIC ---
-        let singleRuleActive = false; // Pelacak status rule
+        let singleRuleActive = false;
 
         function markRuleActive() {
-            singleRuleActive = true; // Aktif jika user menyentuh input/dropdown
+            singleRuleActive = true;
         }
 
         function clearSingleRule() {
-            singleRuleActive = false; // Mati jika user klik tombol 🗑️
+            singleRuleActive = false;
             document.getElementById('editRuleLogic').value = '';
             document.getElementById('editRuleDisc').value = '';
             document.getElementById('editRuleMode').value = 'NORMAL';
         }
+
         function openSingleEdit(key) {
             let item = masterData.items[key];
             document.getElementById('editOriginalName').value = key;
@@ -479,17 +490,16 @@ HTML_TEMPLATE = r"""
                 is_taxable: document.getElementById('editTaxable').checked
             };
 
-            // LOGIKA BARU: Murni berdasarkan status Aktif/Tidak
             if (singleRuleActive) {
                 let ruleLogic = document.getElementById('editRuleLogic').value.trim();
                 let ruleDisc = parseFloat(document.getElementById('editRuleDisc').value || 0);
                 let ruleMode = document.getElementById('editRuleMode').value;
 
-                if (ruleLogic === "") ruleLogic = "True"; // Mutlak True jika kosong
+                if (ruleLogic === "") ruleLogic = "True";
 
                 payload.custom_rule = { logic: ruleLogic, disc: ruleDisc, mode: ruleMode };
             } else {
-                payload.custom_rule = null; // Mutlak hapus jika tombol 🗑️ diklik
+                payload.custom_rule = null;
             }
 
             await fetch('/api/master/item', {
@@ -513,7 +523,7 @@ HTML_TEMPLATE = r"""
         function renderDelayTable(coordsObj, tbodyId, phase) {
             let keys = Object.keys(coordsObj);
             
-            // [FIX BUG 2] Sorting Cerdas: Angka diurutkan secara numerik (1, 2, 3... 10, 11)
+            // Sorting cerdas (numerik awalan & alfabet)
             keys.sort((a, b) => {
                 let matchA = a.match(/^(\d+)_/);
                 let matchB = b.match(/^(\d+)_/);
@@ -521,29 +531,30 @@ HTML_TEMPLATE = r"""
                 if (matchA && matchB) {
                     return parseInt(matchA[1]) - parseInt(matchB[1]);
                 } else if (matchA) {
-                    return -1; // a punya angka, b tidak -> a di atas
+                    return -1;
                 } else if (matchB) {
-                    return 1;  // b punya angka, a tidak -> b di atas
+                    return 1;
                 } else {
-                    return a.localeCompare(b); // Keduanya string biasa
+                    return a.localeCompare(b);
                 }
             });
 
             let html = '';
             keys.forEach(key => {
                 let item = coordsObj[key];
-                // Pastikan ini adalah step yang valid (punya action atau type)
-                if(item && (item.action || item.type)) {
-                    let actionText = (item.action || item.type || 'UNKNOWN').toUpperCase();
+                if(item && typeof item === 'object') {
+                    let actionText = item.action || item.type || (item.value !== undefined ? 'HOTKEY/TEXT' : (item.x !== undefined ? 'CLICK' : 'AREA/BOX'));
+                    actionText = String(actionText).toUpperCase();
                     let currentDelay = item.custom_delay !== undefined ? item.custom_delay : '';
+                    
                     html += `<tr>
-                        <td class="fw-bold small">${key}</td>
-                        <td><span class="badge bg-secondary">${actionText}</span></td>
+                        <td class="fw-bold small align-middle">${key}</td>
+                        <td class="align-middle"><span class="badge bg-secondary">${actionText}</span></td>
                         <td>
                             <input type="number" step="0.1" class="form-control form-control-sm" id="delay_${phase}_${key}" value="${currentDelay}" placeholder="Default">
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-success w-100" onclick="saveDelay('${phase}', '${key}')">Simpan</button>
+                            <button class="btn btn-sm btn-success w-100" onclick="saveDelay('${phase}', '${key}')">💾</button>
                         </td>
                     </tr>`;
                 }
@@ -557,7 +568,7 @@ HTML_TEMPLATE = r"""
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ phase: phase, step_id: stepId, custom_delay: val })
             });
-            alert('Delay untuk ' + stepId + ' berhasil disimpan!');
+            alert(`Delay untuk [${stepId}] berhasil disimpan!`);
         }
 
         window.onload = () => { loadStores(); loadMaster(); loadDelays(); };
@@ -658,13 +669,12 @@ def api_delays():
         val = data.get('custom_delay')
         phase = data.get('phase')
         
-        # Tentukan file mana yang mau diupdate
         target_file = coord1_file if phase == 'phase1' else coord2_file
         
         if os.path.exists(target_file):
             with open(target_file, 'r') as f: coords = json.load(f)
             if step_id in coords:
-                if val == "":
+                if val is None or str(val).strip() == "":
                     if 'custom_delay' in coords[step_id]:
                         del coords[step_id]['custom_delay']
                 else:
@@ -673,7 +683,7 @@ def api_delays():
             with open(target_file, 'w') as f: json.dump(coords, f, indent=4)
         return jsonify({"status": "ok"})
         
-    # GET Request: Kirim kedua file
+    # GET Request: Kirim kedua file koordinat
     coords1 = {}
     coords2 = {}
     if os.path.exists(coord1_file):

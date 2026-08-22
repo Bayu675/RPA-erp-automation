@@ -1,3 +1,5 @@
+# erp-automation/core/auditor.py
+
 import os
 import sys
 import importlib.util
@@ -35,7 +37,6 @@ import tempfile
 import cv2
 import numpy as np
 import pyautogui
-import logging
 from PIL import Image, ImageOps
 from rapidfuzz import process, fuzz
 import threading
@@ -51,6 +52,7 @@ from paddleocr import PaddleOCR
 COORD_FILE = "coordinates_phase2.json"
 MASTER_FILE = "master_data.json"
 MAX_TOLERANCE_RP = 100.0
+
 class TimeoutInput:
     """Helper untuk input dengan countdown timer (Non-Blocking OS Level)"""
     
@@ -192,11 +194,9 @@ class ERP_Auditor:
 
     def normalize_string(self, text):
         text = text.upper()
-        
         # 1. Hapus spasi dulu biar simbol yang kepisah (contoh: / \) bisa nyambung
         text = text.replace(' ', '')
         return "".join(e for e in text if e.isalnum())
-
 
     def safe_save_json(self, data, filepath):
         dir_name = os.path.dirname(filepath) or '.'
@@ -291,7 +291,6 @@ class ERP_Auditor:
             
             is_netto = (type_in in ['2', '3'])
             price_val = (type_in != '3')
-            is_taxable = input("   Kena PPN? (1=Ya, 0=Tdk): ").strip().lower() in ['y', '1', '']
             tax_in = TimeoutInput.get_valid_input("   Kena PPN? (1=Ya, 0=Tdk): ", ['1', '0', 'y', 'n'])
             is_taxable = (tax_in in ['1', 'y'])
 
@@ -417,13 +416,12 @@ class ERP_Auditor:
             
             # Zoom 2x saja
             h, w = img_np.shape[:2]
-            # [FIX 1] Kembalikan ke proporsional (2x zoom). Stretch 3x bikin huruf 'B' rusak.
             img_np = cv2.resize(img_np, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
  
-            # [FIX 2] Gunakan BORDER_CONSTANT (Putih) agar huruf di pinggir tidak terseret/rusak
+            # Gunakan BORDER_CONSTANT (Putih) agar huruf di pinggir tidak terseret/rusak
             img_np = cv2.copyMakeBorder(img_np, 15, 15, 15, 15, cv2.BORDER_CONSTANT, value=[255, 255, 255])
 
-            # --- START DEBUGGING ---
+            # Debugging
             debug_dir = "debug_ocr_images"
             if not os.path.exists(debug_dir):
                 os.makedirs(debug_dir)
@@ -431,7 +429,6 @@ class ERP_Auditor:
             timestamp = int(time.time() * 1000)
             filepath = os.path.join(debug_dir, f"{timestamp}_{debug_name}.png")
             cv2.imwrite(filepath, img_np)
-            # --- END DEBUGGING ---
 
             # Jalankan OCR
             result = self.ocr_engine.ocr(img_np)
@@ -439,11 +436,8 @@ class ERP_Auditor:
             if not result or result[0] is None:
                 return ""
             
-             # [FIX 3] URUTKAN HASIL BACAAN DARI KIRI KE KANAN (Sumbu X)
-            # PaddleOCR kadang memecah 1 baris jadi 2 kotak, dan me-return secara acak.
+            # Urutkan hasil bacaan dari kiri ke kanan (Sumbu X)
             lines = result[0]
-            # Format lines: [ [ [x1,y1], [x2,y2], ... ], ('text', conf) ]
-            # Kita sort berdasarkan koordinat X pojok kiri atas (x1)
             lines.sort(key=lambda item: item[0][0][0])
 
             extracted_texts = []
@@ -456,7 +450,6 @@ class ERP_Auditor:
             return " ".join(extracted_texts).strip()
             
         except Exception as e:
-            from core.logger import BotLogger
             BotLogger.warn(f"PaddleOCR Error: {e}")
             return ""
 
@@ -521,10 +514,7 @@ class ERP_Auditor:
         x1, x2 = col_config['x_start'], col_config['x_end']
         pad_val = col_config.get('ocr_padding', 0)
         
-        # Tambahkan padding langsung ke koordinat crop
         crop = full_screenshot.crop((max(0, x1-pad_val), max(0, yt-pad_val), x2+pad_val, yb+pad_val))
-        
-        # LANGSUNG kirim ke PaddleOCR, abaikan preprocess_image lama
         return self._run_paddle_ocr(crop, debug_name=debug_name or "column")
 
     def ocr_static_box(self, full_screenshot, box_config, custom_config='--psm 7', mode='standard', debug_name="static_box"):
@@ -595,9 +585,15 @@ class ERP_Auditor:
             print(f"   ⏳ Menunggu {wait_time} detik (Switch Window)...", flush=True)
             time.sleep(wait_time)
 
+        # Refresh configs to get any runtime changes from dashboard
+        self.coords = self.load_json(COORD_FILE)
         anchor = self.coords['anchor_item_name']
         pyautogui.click(anchor['x'], anchor['y'])
-        time.sleep(0.2 if skip_startup_wait else 0.5)
+        
+        # Anchor click delay
+        anchor_delay = float(anchor['custom_delay']) if anchor.get('custom_delay') is not None and str(anchor.get('custom_delay')).strip() != "" else (0.2 if skip_startup_wait else 0.5)
+        time.sleep(anchor_delay)
+        
         pyautogui.press('home')
         time.sleep(0.3 if skip_startup_wait else 1.0)
 
@@ -662,7 +658,6 @@ class ERP_Auditor:
 
                 is_duplicate = False
                 if self.last_line_image is not None:
-                    # Auto-adjust frame size consistency 
                     if current_line_img.shape != self.last_line_image.shape:
                         self.last_line_image = cv2.resize(self.last_line_image, (current_line_img.shape[1], current_line_img.shape[0]))
                     
@@ -675,11 +670,9 @@ class ERP_Auditor:
                     if changed_px < 15:
                         is_duplicate = True
 
-                # Execute standard OCR exclusively for console logging (UI display)
                 raw_line = self.ocr_column(full_ss, self.coords['col_line_no'], gy_top, gy_bot, custom_config='--psm 10', mode='repair_broken_font')
                 val_line, _ = self.clean_number_with_raw(raw_line)
 
-                # FIX: Double Protection (Safety Net). Jika OCR berhasil baca, dan angkanya kembar, mutlak duplikat!
                 if val_line > 0:
                     if val_line == self.last_line_no: 
                         is_duplicate = True
@@ -687,11 +680,9 @@ class ERP_Auditor:
 
                 raw_name = self.ocr_column(full_ss, self.coords['col_item_name'], gy_top, gy_bot, custom_config='--psm 6', mode='name_safe', debug_name="col_item_name")
                 
-                # [FIX] Ambil config dan nama cantiknya
                 item_config, matched_name = self.get_master_item(raw_name)
-                if item_config: raw_name = matched_name # Timpa nama jelek OCR dengan nama rapi DB
+                if item_config: raw_name = matched_name
                 
-                # --- FALLBACK OCR (ANTI-HIGHLIGHT BIRU) ---
                 if len(self.clean_text(raw_name)) < 3:
                     print("\r   ⚠️ OCR terhalang blok biru. Mencoba filter alternatif...  ", end="", flush=True)
                     x1, x2 = self.coords['col_item_name']['x_start'], self.coords['col_item_name']['x_end']
@@ -703,7 +694,6 @@ class ERP_Auditor:
                     
                     item_config, matched_name = self.get_master_item(raw_name)
                     if item_config: raw_name = matched_name
-                # ------------------------------------------------
                 
                 if not item_config:
                     if self.handle_unknown_item_interactive(raw_name):
@@ -810,7 +800,6 @@ class ERP_Auditor:
                     continue 
                 else:
                     self.stuck_counter = 0 
-                    # Snapshot target matrix for next loop iteration
                     self.last_line_image = current_line_img.copy()
 
                 is_service = any(k in raw_name for k in list_service) or "BIAYA" in raw_name
@@ -988,11 +977,25 @@ class ERP_Auditor:
             
             if is_valid:
                 BotLogger.info("🎉 INVOICE VALID! EXECUTING SAVE...")
+                
+                # Dynamic Save Execution Delays via Dashboard
                 b1 = self.coords.get('btn_action_1')
-                if b1: pyautogui.click(b1['x'], b1['y']); time.sleep(1.5)
-                pyautogui.press(self.save_key); time.sleep(1.5)
+                if b1:
+                    pyautogui.click(b1['x'], b1['y'])
+                    d_b1 = float(b1['custom_delay']) if b1.get('custom_delay') is not None and str(b1.get('custom_delay')).strip() != "" else self.spd.get('action_delay', 1.5)
+                    time.sleep(d_b1)
+
+                pyautogui.press(self.save_key)
+                hk_cfg = self.coords.get('save_hotkey') or {}
+                d_save = float(hk_cfg['custom_delay']) if hk_cfg.get('custom_delay') is not None and str(hk_cfg.get('custom_delay')).strip() != "" else self.spd.get('action_delay', 1.5)
+                time.sleep(d_save)
+
                 b2 = self.coords.get('btn_action_2')
-                if b2: pyautogui.click(b2['x'], b2['y'])
+                if b2:
+                    pyautogui.click(b2['x'], b2['y'])
+                    d_b2 = float(b2['custom_delay']) if b2.get('custom_delay') is not None and str(b2.get('custom_delay')).strip() != "" else self.spd.get('action_delay', 0.5)
+                    time.sleep(d_b2)
+
                 return True
             else:
                 BotLogger.warn(f"⛔ REJECTED: Grand Total selisih Rp {diff:,.0f} (Maks toleransi Rp {MAX_TOLERANCE_RP})")
