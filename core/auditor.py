@@ -352,7 +352,7 @@ class ERP_Auditor:
             self.safe_save_json(self.master_data, MASTER_FILE)
             self.reload_normalization_cache()
             print("💾 Database Updated! Melanjutkan audit...")
-            return True
+            return final_name
         except Exception as e: 
             BotLogger.error(f"Gagal simpan JSON: {e}")
             return False
@@ -696,7 +696,9 @@ class ERP_Auditor:
                     if item_config: raw_name = matched_name
                 
                 if not item_config:
-                    if self.handle_unknown_item_interactive(raw_name):
+                    new_item_name = self.handle_unknown_item_interactive(raw_name)
+                    if new_item_name:
+                        raw_name = new_item_name
                         item_config, matched_name = self.get_master_item(raw_name)
                         if item_config: raw_name = matched_name
                         anc = self.coords['anchor_item_name']
@@ -760,8 +762,9 @@ class ERP_Auditor:
                     print("   [1] UPDATE DATABASE (Ikut Harga Layar)")
                     print("   [2] REJECT / SKIP Transaksi Ini")
                     print("   [3] STOP BOT (Exit)")
+                    print("   [4] LOLOSKAN (Abaikan Selisih, Lanjut pakai Harga Layar)")
                     
-                    print("\n👉 Pilih [1/2/3]: ", end='', flush=True)
+                    print("\n👉 Pilih [1/2/3/4]: ", end='', flush=True)
                     
                     cfg = settings.get('timeout_mismatch')
                     if cfg is not None and cfg['enabled']:
@@ -776,6 +779,10 @@ class ERP_Auditor:
                             self.safe_save_json(self.master_data, MASTER_FILE)
                             ui.print_success("Database update!")
                             val_price_db = val_price_screen
+                            val_price = val_price_screen 
+                            anc = self.coords['anchor_item_name']
+                            pyautogui.click(anc['x'], anc['y'])
+                            time.sleep(0.5)
                         except: pass
                     elif user_choice == '2': 
                         BotLogger.warn(f"⛔ REJECTED: Selisih harga ditolak user -> [{raw_name}]")
@@ -784,9 +791,15 @@ class ERP_Auditor:
                         BotLogger.warn(f"⛔ REJECTED: Bot dihentikan user (Exit) saat cek harga -> [{raw_name}]")
                         bot_state.STOP_REQUESTED = True
                         return False
+                    elif user_choice == '4':
+                        print(f"   ⏩ DILOLOSKAN: Mengabaikan selisih harga untuk [{raw_name}]")
+                        val_price = val_price_screen
+                        anc = self.coords['anchor_item_name']
+                        pyautogui.click(anc['x'], anc['y'])
+                        time.sleep(0.5)
                     else:
                         BotLogger.warn(f"⛔ REJECTED: Timeout / Input tidak valid saat cek harga -> [{raw_name}]")
-                        return False 
+                        return False
 
                 if is_duplicate:
                     self.stuck_counter += 1
@@ -817,25 +830,18 @@ class ERP_Auditor:
 
                 is_moved_to_footer = False
                 if should_validate_price and item_config:
-                    db_discs = item_config.get('default_discs', [0.0, 0.0, 0.0, 0.0])
+                    raw_db = item_config.get('default_discs', [])
+                    active_db_discs = [round(float(d), 2) for d in raw_db if float(d or 0) > 0]
+                    active_row_discs = [round(float(d), 2) for d in d_rows if float(d or 0) > 0]
+                    active_footer_discs = [round(float(d), 2) for d in global_f_discs if float(d or 0) > 0]
                     
                     disc_mismatch = False
                     
-                    match_line = True
-                    for i in range(4):
-                        if abs(d_rows[i] - db_discs[i]) > 0.1:
-                            match_line = False
-                            break
-                            
-                    if not match_line:
-                        is_line_zero = all(d < 0.1 for d in d_rows)
-                        match_footer = True
-                        for i in range(4):
-                            if abs(global_f_discs[i] - db_discs[i]) > 0.1:
-                                match_footer = False
-                                break
-                                
-                        if is_line_zero and match_footer:
+                    if active_db_discs == active_row_discs:
+                        match_line = True
+                    else:
+                        # 3. Jika di baris kosong (0%), cek apakah diskon DB dipindah ke Footer
+                        if len(active_row_discs) == 0 and active_db_discs == active_footer_discs:
                             is_moved_to_footer = True 
                         else:
                             disc_mismatch = True 
@@ -845,9 +851,9 @@ class ERP_Auditor:
                         print("\n" + "┏" + "━"*60 + "┓")
                         print(f"┃ 🚨 DISCOUNT MISMATCH DETECTED: {raw_name[:25]:<25} ┃")
                         print("┣" + "━"*60 + "┫")
-                        db_disc_str = " + ".join([f"{d}%" for d in db_discs if d > 0]) or "0%"
-                        scr_disc_str = " + ".join([f"{d}%" for d in d_rows if d > 0]) or "0%"
-                        ftr_disc_str = " + ".join([f"{d}%" for d in global_f_discs if d > 0]) or "0%"
+                        db_disc_str = " + ".join([f"{d}%" for d in active_db_discs]) or "0%"
+                        scr_disc_str = " + ".join([f"{d}%" for d in active_row_discs]) or "0%"
+                        ftr_disc_str = " + ".join([f"{d}%" for d in active_footer_discs]) or "0%"
                         print(f"┃ 💾 Database (Expected) : {db_disc_str}".ljust(61) + "┃")
                         print(f"┃ 🖥️  Screen Line (Row)   : {scr_disc_str}".ljust(61) + "┃")
                         print(f"┃ 🖥️  Screen Footer       : {ftr_disc_str}".ljust(61) + "┃")
@@ -857,9 +863,10 @@ class ERP_Auditor:
                         print("   [1] UPDATE DATABASE (Ikut Diskon Layar)")
                         print("   [2] REJECT / SKIP Transaksi Ini")
                         print("   [3] STOP BOT (Exit)")
-                        
-                        print("\n👉 Pilih [1/2/3]: ", end='', flush=True)
-                        
+                        print("   [4] LOLOSKAN (Abaikan Selisih, Lanjut pakai Diskon Layar)")
+                            
+                        print("\n👉 Pilih [1/2/3/4]: ", end='', flush=True)
+                            
                         cfg = settings.get('timeout_mismatch')
                         if cfg is not None and cfg['enabled']:
                             user_choice = TimeoutInput.get_choice_with_timeout(cfg['seconds'], default_choice='2')
@@ -872,6 +879,9 @@ class ERP_Auditor:
                             try:
                                 self.safe_save_json(self.master_data, MASTER_FILE)
                                 ui.print_success("Database Diskon diupdate!")
+                                anc = self.coords['anchor_item_name']
+                                pyautogui.click(anc['x'], anc['y'])
+                                time.sleep(0.5)
                             except: pass
                         elif user_choice == '2': 
                             BotLogger.warn(f"⛔ REJECTED: Selisih diskon ditolak user -> [{raw_name}]")
@@ -880,8 +890,16 @@ class ERP_Auditor:
                             BotLogger.warn(f"⛔ REJECTED: Bot dihentikan user (Exit) saat cek diskon -> [{raw_name}]")
                             bot_state.STOP_REQUESTED = True
                             return False
+                        elif user_choice == '4':
+                            print(f"   ⏩ DILOLOSKAN: Mengabaikan selisih diskon untuk [{raw_name}]")
+                            anc = self.coords['anchor_item_name']
+                            pyautogui.click(anc['x'], anc['y'])
+                            time.sleep(0.5)
                         else:
                             BotLogger.warn(f"⛔ REJECTED: Timeout / Input tidak valid saat cek diskon -> [{raw_name}]")
+                            anc = self.coords['anchor_item_name']
+                            pyautogui.click(anc['x'], anc['y'])
+                            time.sleep(0.5)
                             return False
                 
                 if calc_mode == 'FLAT_M2':
