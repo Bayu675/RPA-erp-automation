@@ -780,9 +780,8 @@ class ERP_Auditor:
                             ui.print_success("Database update!")
                             val_price_db = val_price_screen
                             val_price = val_price_screen 
-                            anc = self.coords['anchor_item_name']
-                            pyautogui.click(anc['x'], anc['y'])
-                            time.sleep(0.5)
+                            print("   🔄 RESTART AUDIT: Menghitung ulang dari baris 1...")
+                            return self.run_audit(skip_startup_wait=True)
                         except: pass
                     elif user_choice == '2': 
                         BotLogger.warn(f"⛔ REJECTED: Selisih harga ditolak user -> [{raw_name}]")
@@ -794,9 +793,8 @@ class ERP_Auditor:
                     elif user_choice == '4':
                         print(f"   ⏩ DILOLOSKAN: Mengabaikan selisih harga untuk [{raw_name}]")
                         val_price = val_price_screen
-                        anc = self.coords['anchor_item_name']
-                        pyautogui.click(anc['x'], anc['y'])
-                        time.sleep(0.5)
+                        print("   🔄 RESTART AUDIT: Menghitung ulang dari baris 1...")
+                        return self.run_audit(skip_startup_wait=True)
                     else:
                         BotLogger.warn(f"⛔ REJECTED: Timeout / Input tidak valid saat cek harga -> [{raw_name}]")
                         return False
@@ -879,9 +877,8 @@ class ERP_Auditor:
                             try:
                                 self.safe_save_json(self.master_data, MASTER_FILE)
                                 ui.print_success("Database Diskon diupdate!")
-                                anc = self.coords['anchor_item_name']
-                                pyautogui.click(anc['x'], anc['y'])
-                                time.sleep(0.5)
+                                print("   🔄 RESTART AUDIT: Menghitung ulang dari baris 1...")
+                                return self.run_audit(skip_startup_wait=True)
                             except: pass
                         elif user_choice == '2': 
                             BotLogger.warn(f"⛔ REJECTED: Selisih diskon ditolak user -> [{raw_name}]")
@@ -892,9 +889,8 @@ class ERP_Auditor:
                             return False
                         elif user_choice == '4':
                             print(f"   ⏩ DILOLOSKAN: Mengabaikan selisih diskon untuk [{raw_name}]")
-                            anc = self.coords['anchor_item_name']
-                            pyautogui.click(anc['x'], anc['y'])
-                            time.sleep(0.5)
+                            print("   🔄 RESTART AUDIT: Menghitung ulang dari baris 1...")
+                            return self.run_audit(skip_startup_wait=True)
                         else:
                             BotLogger.warn(f"⛔ REJECTED: Timeout / Input tidak valid saat cek diskon -> [{raw_name}]")
                             anc = self.coords['anchor_item_name']
